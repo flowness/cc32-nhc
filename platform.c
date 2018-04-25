@@ -91,6 +91,16 @@ extern UART_Handle uart;
 extern const char helpPrompt;
 extern const char userPrompt;
 
+
+void print(const char *String)
+{
+    //char errorBuff[256]={0};
+    //sprintf(errorBuff,"Error! code = %d, desc = %s\r\n", code, errString);
+    UART_write(uart, String,strlen(String));
+    UART_write(uart, "\r\n",sizeof("\r\n"));
+
+}
+
 static void DisplayBanner()
 {
     print("");
@@ -312,15 +322,6 @@ void printError(char *errString, int code)
     while(1);
 }
 
-void print(const char *String)
-{
-    //char errorBuff[256]={0};
-    //sprintf(errorBuff,"Error! code = %d, desc = %s\r\n", code, errString);
-    UART_write(uart, String,strlen(String));
-    UART_write(uart, "\r\n",sizeof("\r\n"));
-
-}
-
 int16_t Connect(void)
 {
     SlWlanSecParams_t   secParams = {0};
@@ -328,9 +329,7 @@ int16_t Connect(void)
     secParams.Key = (signed char*)SECURITY_KEY;
     secParams.KeyLen = strlen(SECURITY_KEY);
     secParams.Type = SECURITY_TYPE;
-    //UART_write( "Connecting to : %s.\r\n",SSID_NAME);
     ret = sl_WlanConnect((signed char*)SSID_NAME, strlen(SSID_NAME), 0, &secParams, 0);
-    //UART_write( "sl_WlanConnect finished with return: 0x%x.\r\n",ret);
     if (ret)
     {
         printError("Connection failed , error code : %d \r\n", ret);
@@ -460,24 +459,24 @@ void mainThread(void *pvParameters)
     }
     print("sl_Start...");
 
+    DisplayBanner();
+    print(&helpPrompt);
+    print(&userPrompt);
+
     if(0==Connect())
     {
         char printString[256]={0};
         sprintf(printString, "Wifi Connected to %s",SSID_NAME);
         print(printString);
 
-/*
+
         status = pthread_create(&httpThread, &pAttrs, httpTask, NULL);
         if(status)
         {
             printError("Task create failed, error code : %d \r\n", status);
         }
-        */
-    }
 
-    DisplayBanner();
-    print(&helpPrompt);
-    print(&userPrompt);
+    }
 
 }
 

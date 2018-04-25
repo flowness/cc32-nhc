@@ -43,13 +43,15 @@
 
 #include <ti/drivers/net/wifi/simplelink.h>
 #include <ti/drivers/net/wifi/slnetifwifi.h>
+#include <ti/utils/json/json.h>
+
 
 #include "semaphore.h"
 
 #define APPLICATION_NAME      "HTTP GET"
 
-#define HOSTNAME "https://httpbin.org"
-#define REQUEST_URI "/get"
+#define HOSTNAME "https://now.httpbin.org"
+#define REQUEST_URI "/"
 /*
 #define HOSTNAME              "http://www.google.com"
 #define REQUEST_URI           "/"
@@ -57,11 +59,27 @@
 #define USER_AGENT            "HTTPClient (ARM; TI-RTOS)"
 #define HTTP_MIN_RECV         (256)
 
+const char template[] = "{                         \
+                        \"now\": {              \
+                        \"epoch\": int32,      \
+                        \"slang_date\": string, \
+                        \"slang_time\": string, \
+                        \"iso8601\": string,    \
+                        \"rfc2822\": string,    \
+                        \"rfc3339\": string     \
+                      },                        \
+                      \"urls\": [string]        \
+                    }";
 //extern Display_Handle display;
 extern sem_t    ipEventSyncObj;
 extern void printError(char *errString, int code);
 extern void print(const char *String);
 extern UART_Handle uart;
+
+
+Json_Handle     jsonObjHandle;
+Json_Handle     templateHandle;
+
 
 //*****************************************************************************
 //
@@ -80,9 +98,12 @@ extern UART_Handle uart;
 void* httpTask(void* pvParameters)
 {
     bool moreDataFlag = false;
-    char data[HTTP_MIN_RECV];
+    char data[300]={0};
+    char getBuffer[200]={0};
     int16_t ret = 0;
     int16_t len = 0;
+    uint16_t valueSize = 200;
+    char *key =  "\"now\".\"iso8601\"";
 
     /* Print Application name */
     HTTPClient_extSecParams httpClientSecParams;
@@ -93,7 +114,6 @@ void* httpTask(void* pvParameters)
 
 
     sem_wait(&ipEventSyncObj);
-    //UART_write( "Sending a HTTP GET request to '%s'\n",HOSTNAME);
 
     HTTPClient_Handle httpClientHandle;
     int16_t statusCode;
@@ -131,11 +151,56 @@ void* httpTask(void* pvParameters)
         if (ret < 0) {
             printError("httpTask: response body processing failed", ret);
         }
-        print(data);
         len += ret;
     }while (moreDataFlag);
 
+    print(data);
+
     sprintf(errorBuff,"Received %d bytes of payload\r\n", len);
+    print(errorBuff);
+
+    ret = Json_createTemplate(&templateHandle , template, strlen(template));
+    if (ret<0)
+    {
+        printError(" Couldn't create template",ret);
+    }
+    else
+    {
+        print("Template object created successfully");
+    }
+
+    ret = Json_createObject(&jsonObjHandle,templateHandle,1024);
+    if (ret < 0)
+    {
+        printError("Couldn't create json object", ret);
+    }
+    else
+    {
+        print("Json object created successfully");
+    }
+
+    ret = Json_parse(jsonObjHandle,data,len);
+    if (ret<0)
+    {
+        printError("Couldn't parse the Json file \n\r", ret);
+    }
+    else
+    {
+        print("Json was parsed successfully");
+    }
+
+    ret = Json_getValue(jsonObjHandle,key,getBuffer,&valueSize);
+    if (ret == JSON_RC__VALUE_IS_NULL)
+    {
+        printError("The value is null\n\r",ret);
+        return(0);
+    }
+    else if (ret<0)
+    {
+        printError("Couldn't get the data \n\r",ret);
+        return(0);
+    }
+    sprintf(errorBuff,"The value is : %s",getBuffer);
     print(errorBuff);
 
     ret = HTTPClient_disconnect(httpClientHandle);
